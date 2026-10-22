@@ -16,6 +16,7 @@ import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.net.Uri;
+import android.util.Log;
 
 import java.io.File;
 import java.io.InputStream;
@@ -90,7 +91,30 @@ public class VideoRenderer {
             titleBmp = buildTitleBitmap(stoneBitmap, titleText.trim(), gomotorFont, grayscale);
         }
 
-        byte[] yuvBuf = new byte[W * H * 3 / 2];
+        MediaFormat inputFormat = encoder.getInputFormat();
+        int stride = W;
+        if (inputFormat != null && inputFormat.containsKey("stride")) {
+            stride = inputFormat.getInteger("stride");
+        }
+        int minStride = (W + 31) & ~31;
+        if (stride < minStride) {
+            stride = minStride;
+        }
+
+        int sliceHeight = H;
+        if (inputFormat != null && inputFormat.containsKey("slice-height")) {
+            sliceHeight = inputFormat.getInteger("slice-height");
+        }
+        int minSliceHeight = (H + 15) & ~15;
+        if (sliceHeight < minSliceHeight) {
+            sliceHeight = minSliceHeight;
+        }
+
+        Log.i("VideoRenderer", "Encoder input format: W=" + W + " H=" + H + " stride=" + stride + " sliceHeight=" + sliceHeight);
+
+        int ySize = stride * sliceHeight;
+        int uvSize = stride * (sliceHeight / 2);
+        byte[] yuvBuf = new byte[ySize + uvSize];
         int[] argbBuf = new int[W * H];
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
 
@@ -102,7 +126,7 @@ public class VideoRenderer {
                 if (f < titleFrames && titleBmp != null) {
                     if (curBmp != titleBmp) {
                         curBmp = titleBmp;
-                        argbToNV12(curBmp, argbBuf, yuvBuf);
+                        argbToNV12(curBmp, argbBuf, yuvBuf, stride, sliceHeight);
                     }
                 } else {
                     int sIdx = ((f - titleFrames) / Math.max(1, framesPerSlide)) % nSlides;
@@ -116,7 +140,7 @@ public class VideoRenderer {
                             curBmp = decodeAndCrop(ctx, imageUris.get(poolIdx), grayscale);
                             if (poolIdx < cache.length) cache[poolIdx] = curBmp;
                         }
-                        argbToNV12(curBmp, argbBuf, yuvBuf);
+                        argbToNV12(curBmp, argbBuf, yuvBuf, stride, sliceHeight);
                     }
                 }
 
@@ -126,12 +150,14 @@ public class VideoRenderer {
                     inIdx = encoder.dequeueInputBuffer(10000);
                 }
                 ByteBuffer inBuf = encoder.getInputBuffer(inIdx);
+                int bytesToQueue = yuvBuf.length;
                 if (inBuf != null) {
                     inBuf.clear();
-                    inBuf.put(yuvBuf, 0, Math.min(inBuf.remaining(), yuvBuf.length));
+                    bytesToQueue = Math.min(inBuf.remaining(), yuvBuf.length);
+                    inBuf.put(yuvBuf, 0, bytesToQueue);
                 }
                 long ptsUs = (f * 1000000L) / FPS;
-                encoder.queueInputBuffer(inIdx, 0, yuvBuf.length, ptsUs, 0);
+                encoder.queueInputBuffer(inIdx, 0, bytesToQueue, ptsUs, 0);
 
                 if (listener != null && (f % 5 == 0 || f == totalFrames - 1)) {
                     listener.onProgress(f + 1, totalFrames, "Encoding frame " + (f + 1) + "/" + totalFrames);
@@ -277,24 +303,27 @@ public class VideoRenderer {
         return dst;
     }
 
-    private static void argbToNV12(Bitmap bmp, int[] argb, byte[] yuv) {
+    private static void argbToNV12(Bitmap bmp, int[] argb, byte[] yuv, int stride, int sliceHeight) {
         bmp.getPixels(argb, 0, W, 0, 0, W, H);
-        int frameSize = W * H;
-        int yIndex = 0;
-        int uvIndex = frameSize;
+        int yPlaneSize = stride * sliceHeight;
         for (int j = 0; j < H; j++) {
+            int yRowOffset = j * stride;
+            int argbRowOffset = j * W;
             for (int i = 0; i < W; i++) {
-                int c = argb[j * W + i];
+                int c = argb[argbRowOffset + i];
                 int r = (c >> 16) & 0xff;
                 int g = (c >> 8) & 0xff;
                 int b = c & 0xff;
                 int y = ((66 * r + 129 * g + 25 * b + 128) >> 8) + 16;
-                int u = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
-                int v = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
-                yuv[yIndex++] = (byte) (y < 0 ? 0 : (y > 255 ? 255 : y));
-                if ((j & 1) == 0 && (i & 1) == 0 && uvIndex + 1 < yuv.length) {
-                    yuv[uvIndex++] = (byte) (u < 0 ? 0 : (u > 255 ? 255 : u));
-                    yuv[uvIndex++] = (byte) (v < 0 ? 0 : (v > 255 ? 255 : v));
+                yuv[yRowOffset + i] = (byte) (y < 0 ? 0 : (y > 255 ? 255 : y));
+                if ((j & 1) == 0 && (i & 1) == 0) {
+                    int u = ((-38 * r - 74 * g + 112 * b + 128) >> 8) + 128;
+                    int v = ((112 * r - 94 * g - 18 * b + 128) >> 8) + 128;
+                    int uvOffset = yPlaneSize + (j / 2) * stride + i;
+                    if (uvOffset + 1 < yuv.length) {
+                        yuv[uvOffset] = (byte) (u < 0 ? 0 : (u > 255 ? 255 : u));
+                        yuv[uvOffset + 1] = (byte) (v < 0 ? 0 : (v > 255 ? 255 : v));
+                    }
                 }
             }
         }

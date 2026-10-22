@@ -60,17 +60,25 @@ apk: assets/noise.png assets/gomotor.ttf $(STAGE_DIR)/lib/arm64-v8a/libgraph_dad
 		keytool -genkeypair -v -keystore "$(KEYSTORE)" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"; \
 	fi
 	$(APKSIGNER) sign --ks "$(KEYSTORE)" --ks-pass pass:android --key-pass pass:android --out $(APK) $(APK_UNSIGNED)
+	@if [ -d "$(HOME)/phone-DCIM" ]; then \
+		mkdir -p "$(HOME)/phone-DCIM/Graph"; \
+		cp -f $(APK) "$(HOME)/phone-DCIM/Graph/Graph.apk"; \
+		echo "[Graph] Synced APK to $(HOME)/phone-DCIM/Graph/Graph.apk (Syncthing)"; \
+	fi
 	@echo "[Graph] Built signed APK: $(APK)"
 
 install: apk
-	adb install -r $(APK)
-	adb shell appops set cz.kof.graph MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true
-	adb shell pm grant cz.kof.graph android.permission.READ_MEDIA_IMAGES 2>/dev/null || true
-	adb shell pm grant cz.kof.graph android.permission.READ_MEDIA_VIDEO 2>/dev/null || true
-	adb shell pm grant cz.kof.graph android.permission.READ_MEDIA_AUDIO 2>/dev/null || true
-	adb shell pm grant cz.kof.graph android.permission.READ_EXTERNAL_STORAGE 2>/dev/null || true
-	adb shell pm grant cz.kof.graph android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null || true
-	@echo "[Graph] Installed cz.kof.graph onto connected Android device."
+	@if adb get-state >/dev/null 2>&1; then \
+		adb install -r $(APK) || adb push $(APK) /sdcard/Download/Graph.apk; \
+		adb shell appops set cz.kof.graph MANAGE_EXTERNAL_STORAGE allow 2>/dev/null || true; \
+		adb shell pm grant cz.kof.graph android.permission.READ_MEDIA_IMAGES 2>/dev/null || true; \
+		adb shell pm grant cz.kof.graph android.permission.READ_MEDIA_VIDEO 2>/dev/null || true; \
+		adb shell pm grant cz.kof.graph android.permission.READ_MEDIA_AUDIO 2>/dev/null || true; \
+		adb shell pm grant cz.kof.graph android.permission.READ_EXTERNAL_STORAGE 2>/dev/null || true; \
+		adb shell pm grant cz.kof.graph android.permission.WRITE_EXTERNAL_STORAGE 2>/dev/null || true; \
+	else \
+		echo "[Graph] No USB adb device attached — Graph.apk is synced via Syncthing in DCIM/Graph/Graph.apk"; \
+	fi
 
 run: install
 	adb shell am start -n cz.kof.graph/.MainActivity

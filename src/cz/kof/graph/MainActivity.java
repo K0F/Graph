@@ -4,7 +4,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -14,17 +13,9 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.Settings;
-import android.view.Gravity;
-import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.VideoView;
 
@@ -34,7 +25,6 @@ import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -58,17 +48,10 @@ public class MainActivity extends Activity {
     private final List<File> musicFiles = new ArrayList<>();
 
     private TextView statusText;
-    private TextView photoCountText;
-    private Spinner modeSpinner;
-    private Spinner durationSpinner;
-    private Spinner musicSpinner;
-    private CheckBox grayscaleCheck;
-    private EditText titleInput;
     private VideoView videoPreview;
-    private Button renderBtn;
-    private Button shareAllBtn;
-    private Button shareWaBtn;
-    private Button shareFbBtn;
+    private Button pickBtn;
+    private Button latestBtn;
+    private Button shareBtn;
 
     private File lastRenderedMp4 = null;
     private byte[] stoneBytes = null;
@@ -80,8 +63,8 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         requestNeededPermissions();
         loadAssets();
-        buildUi();
         scanMusicPool();
+        buildUi();
         handleIncomingIntent(getIntent());
     }
 
@@ -125,136 +108,52 @@ public class MainActivity extends Activity {
     }
 
     private void buildUi() {
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(Color.parseColor("#0D0D0D"));
-
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(16);
+        root.setBackgroundColor(Color.parseColor("#0D0D0D"));
+        int pad = dp(18);
         root.setPadding(pad, pad, pad, pad);
 
-        TextView header = label("GRAPH // K0F AV ENGINE", 20, "#00FF66");
-        header.setPadding(0, 0, 0, dp(4));
+        TextView header = label("GRAPH", 22, "#00FF66");
+        header.setPadding(0, 0, 0, dp(8));
         root.addView(header);
 
-        TextView sub = label("Share-To & Local Photo Short Video Generator (932x576@25 PAL SD)", 12, "#888888");
-        sub.setPadding(0, 0, 0, dp(12));
-        root.addView(sub);
-
-        photoCountText = label("Selected photos: 0", 14, "#FFFFFF");
-        photoCountText.setPadding(0, 0, 0, dp(8));
-        root.addView(photoCountText);
-
-        LinearLayout pickRow = new LinearLayout(this);
-        pickRow.setOrientation(LinearLayout.HORIZONTAL);
-
-        Button pickGalleryBtn = button("Pick Photos", "#222222", "#00FF66");
-        pickGalleryBtn.setOnClickListener(v -> openGalleryPicker());
-        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        lp1.rightMargin = dp(6);
-        pickRow.addView(pickGalleryBtn, lp1);
-
-        Button pickLatestBtn = button("Latest 24 (DCIM/Camera)", "#222222", "#FFFFFF");
-        pickLatestBtn.setOnClickListener(v -> loadLatestCameraPhotos(24));
-        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        pickRow.addView(pickLatestBtn, lp2);
-
-        root.addView(pickRow);
-
-        root.addView(sectionLabel("MODE / CUT TIMING"));
-        modeSpinner = new Spinner(this);
-        modeSpinner.setBackgroundColor(Color.parseColor("#1A1A1A"));
-        ArrayAdapter<String> modeAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{
-                "Dada Stone Oracle (0.20s / 5 frames per slide)",
-                "Standard Slides (0.44s / 11 frames per slide)",
-                "Slow Montage (1.00s / 25 frames per slide)"
-        });
-        modeSpinner.setAdapter(modeAdapter);
-        root.addView(modeSpinner);
-
-        root.addView(sectionLabel("VIDEO DURATION"));
-        durationSpinner = new Spinner(this);
-        durationSpinner.setBackgroundColor(Color.parseColor("#1A1A1A"));
-        ArrayAdapter<String> durAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new String[]{
-                "8 seconds (short clip)",
-                "15 seconds (story / status)",
-                "30 seconds",
-                "60 seconds (full dada film)"
-        });
-        durationSpinner.setAdapter(durAdapter);
-        durationSpinner.setSelection(1);
-        root.addView(durationSpinner);
-
-        root.addView(sectionLabel("AUDIO / MUSIC POOL (/sdcard/Music/gram)"));
-        musicSpinner = new Spinner(this);
-        musicSpinner.setBackgroundColor(Color.parseColor("#1A1A1A"));
-        root.addView(musicSpinner);
-
-        root.addView(sectionLabel("OPENING TITLE (OVER STONE)"));
-        titleInput = new EditText(this);
-        titleInput.setText("kof26");
-        titleInput.setTextColor(Color.WHITE);
-        titleInput.setHintTextColor(Color.GRAY);
-        titleInput.setTypeface(Typeface.MONOSPACE);
-        titleInput.setBackgroundColor(Color.parseColor("#1A1A1A"));
-        titleInput.setPadding(dp(10), dp(8), dp(10), dp(8));
-        root.addView(titleInput);
-
-        grayscaleCheck = new CheckBox(this);
-        grayscaleCheck.setText("BT.601 Grayscale (gram signature monochrome)");
-        grayscaleCheck.setTextColor(Color.WHITE);
-        grayscaleCheck.setChecked(true);
-        grayscaleCheck.setPadding(0, dp(8), 0, dp(8));
-        root.addView(grayscaleCheck);
-
-        renderBtn = button("RENDER SHORT VIDEO (.MP4)", "#005522", "#00FF66");
-        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        rlp.topMargin = dp(10);
-        rlp.bottomMargin = dp(10);
-        renderBtn.setOnClickListener(v -> startRender());
-        root.addView(renderBtn, rlp);
-
-        statusText = label("Ready.", 13, "#00FF66");
-        statusText.setPadding(0, dp(4), 0, dp(8));
+        statusText = label("Select photos or share from Gallery -> auto-renders MP4.", 14, "#FFFFFF");
+        statusText.setPadding(0, 0, 0, dp(14));
         root.addView(statusText);
+
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        btnLp.bottomMargin = dp(10);
+
+        pickBtn = button("1. PICK PHOTOS & RENDER", "#004422", "#00FF66");
+        pickBtn.setOnClickListener(v -> openGalleryPicker());
+        root.addView(pickBtn, btnLp);
+
+        latestBtn = button("2. LATEST CAMERA PHOTOS & RENDER", "#222222", "#FFFFFF");
+        latestBtn.setOnClickListener(v -> {
+            if (loadLatestCameraPhotos(24)) {
+                startRender(true);
+            }
+        });
+        root.addView(latestBtn, btnLp);
 
         videoPreview = new VideoView(this);
         LinearLayout.LayoutParams vlp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(210));
-        vlp.bottomMargin = dp(10);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(240));
+        vlp.bottomMargin = dp(12);
         root.addView(videoPreview, vlp);
 
-        shareAllBtn = button("SHARE VIDEO (SYSTEM SHEET)", "#1F1F1F", "#FFFFFF");
-        shareAllBtn.setEnabled(false);
-        shareAllBtn.setOnClickListener(v -> shareRenderedVideo(null));
-        root.addView(shareAllBtn, rlp);
+        shareBtn = button("3. SHARE VIDEO (WHATSAPP / FB)", "#143320", "#44FF88");
+        shareBtn.setEnabled(false);
+        shareBtn.setOnClickListener(v -> shareRenderedVideo());
+        root.addView(shareBtn, btnLp);
 
-        LinearLayout socialRow = new LinearLayout(this);
-        socialRow.setOrientation(LinearLayout.HORIZONTAL);
-
-        shareWaBtn = button("WhatsApp / Channel", "#143320", "#44FF88");
-        shareWaBtn.setEnabled(false);
-        shareWaBtn.setOnClickListener(v -> shareRenderedVideo("com.whatsapp"));
-        socialRow.addView(shareWaBtn, lp1);
-
-        shareFbBtn = button("Facebook (Personal)", "#142238", "#66B2FF");
-        shareFbBtn.setEnabled(false);
-        shareFbBtn.setOnClickListener(v -> shareRenderedVideo("com.facebook.katana"));
-        socialRow.addView(shareFbBtn, lp2);
-
-        root.addView(socialRow);
-
-        scroll.addView(root);
-        setContentView(scroll);
+        setContentView(root);
     }
 
     private void scanMusicPool() {
         musicFiles.clear();
-        List<String> names = new ArrayList<>();
-        names.add("Random Track from /sdcard/Music/gram");
-        names.add("Mute (Silent Video)");
-
         File[] dirs = new File[]{
                 new File(Environment.getExternalStorageDirectory(), "Music/gram"),
                 new File(Environment.getExternalStorageDirectory(), "Music"),
@@ -267,16 +166,13 @@ public class MainActivity extends Activity {
                     Arrays.sort(list, Comparator.comparing(File::getName));
                     for (File f : list) {
                         String n = f.getName().toLowerCase(Locale.ROOT);
-                        if (f.isFile() && (n.endsWith(".m4a") || n.endsWith(".aac") || n.endsWith(".mp4") || n.endsWith(".mp3") || n.endsWith(".wav") || n.endsWith(".flac"))) {
+                        if (f.isFile() && (n.endsWith(".m4a") || n.endsWith(".aac") || n.endsWith(".mp4"))) {
                             musicFiles.add(f);
-                            names.add(f.getName());
                         }
                     }
                 }
             }
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, names);
-        musicSpinner.setAdapter(adapter);
     }
 
     private void handleIncomingIntent(Intent intent) {
@@ -284,31 +180,24 @@ public class MainActivity extends Activity {
         String action = intent.getAction();
         String type = intent.getType();
         if (type != null && type.startsWith("image/")) {
+            selectedUris.clear();
             if (Intent.ACTION_SEND.equals(action)) {
                 Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
-                if (uri != null) {
-                    selectedUris.clear();
-                    selectedUris.add(uri);
-                }
+                if (uri != null) selectedUris.add(uri);
             } else if (Intent.ACTION_SEND_MULTIPLE.equals(action)) {
                 ArrayList<Uri> list = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
-                if (list != null && !list.isEmpty()) {
-                    selectedUris.clear();
-                    selectedUris.addAll(list);
-                }
-            } else if (intent.getClipData() != null) {
+                if (list != null) selectedUris.addAll(list);
+            }
+            if (selectedUris.isEmpty() && intent.getClipData() != null) {
                 ClipData cd = intent.getClipData();
-                selectedUris.clear();
                 for (int i = 0; i < cd.getItemCount(); i++) {
                     Uri u = cd.getItemAt(i).getUri();
                     if (u != null) selectedUris.add(u);
                 }
             }
-        }
-        if (selectedUris.isEmpty()) {
-            loadLatestCameraPhotos(16);
-        } else {
-            updatePhotoCount("Received " + selectedUris.size() + " shared photo(s)");
+            if (!selectedUris.isEmpty()) {
+                startRender(true);
+            }
         }
     }
 
@@ -316,7 +205,7 @@ public class MainActivity extends Activity {
         Intent i = new Intent(Intent.ACTION_GET_CONTENT);
         i.setType("image/*");
         i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        startActivityForResult(Intent.createChooser(i, "Select Photos for Graph"), REQ_PICK_PHOTOS);
+        startActivityForResult(Intent.createChooser(i, "Select Photos"), REQ_PICK_PHOTOS);
     }
 
     @Override
@@ -333,23 +222,21 @@ public class MainActivity extends Activity {
             } else if (data.getData() != null) {
                 selectedUris.add(data.getData());
             }
-            updatePhotoCount("Selected " + selectedUris.size() + " photo(s)");
+            if (!selectedUris.isEmpty()) {
+                startRender(true);
+            }
         }
     }
 
-    private void loadLatestCameraPhotos(int maxCount) {
+    private boolean loadLatestCameraPhotos(int maxCount) {
         File camDir = new File(Environment.getExternalStorageDirectory(), "DCIM/Camera");
-        if (!camDir.exists() || !camDir.isDirectory()) {
-            updatePhotoCount("DCIM/Camera not accessible yet — tap Pick Photos");
-            return;
-        }
         File[] files = camDir.listFiles((dir, name) -> {
             String low = name.toLowerCase(Locale.ROOT);
             return !name.startsWith(".") && (low.endsWith(".jpg") || low.endsWith(".jpeg") || low.endsWith(".png"));
         });
         if (files == null || files.length == 0) {
-            updatePhotoCount("No photos in DCIM/Camera — tap Pick Photos");
-            return;
+            statusText.setText("No photos in DCIM/Camera — tap Pick Photos.");
+            return false;
         }
         Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
         selectedUris.clear();
@@ -357,43 +244,23 @@ public class MainActivity extends Activity {
         for (int i = 0; i < lim; i++) {
             selectedUris.add(Uri.fromFile(files[i]));
         }
-        updatePhotoCount("Loaded latest " + selectedUris.size() + " photo(s) from DCIM/Camera");
+        return true;
     }
 
-    private void updatePhotoCount(String msg) {
-        photoCountText.setText("Photos: " + selectedUris.size() + "  (" + msg + ")");
-    }
+    private void startRender(final boolean autoShareWhenDone) {
+        if (selectedUris.isEmpty()) return;
+        pickBtn.setEnabled(false);
+        latestBtn.setEnabled(false);
+        shareBtn.setEnabled(false);
 
-    private void startRender() {
-        if (selectedUris.isEmpty()) {
-            statusText.setText("Please pick at least 1 photo first.");
-            return;
-        }
-        renderBtn.setEnabled(false);
-        shareAllBtn.setEnabled(false);
-        shareWaBtn.setEnabled(false);
-        shareFbBtn.setEnabled(false);
-
-        final int modeIdx = modeSpinner.getSelectedItemPosition();
-        final int framesPerSlide = (modeIdx == 0) ? 5 : (modeIdx == 1 ? 11 : 25);
-        final int durIdx = durationSpinner.getSelectedItemPosition();
-        final int durationSec = (durIdx == 0) ? 8 : (durIdx == 1 ? 15 : (durIdx == 2 ? 30 : 60));
+        scanMusicPool();
+        final int framesPerSlide = 11; // 0.44s per slide
+        final int durationSec = 12;    // 12s short video
         final int totalFrames = durationSec * VideoRenderer.FPS;
-        final boolean grayscale = grayscaleCheck.isChecked();
-        final String title = titleInput.getText().toString();
         final List<Uri> urisCopy = new ArrayList<>(selectedUris);
-
-        File chosenMusic = null;
-        int mPos = musicSpinner.getSelectedItemPosition();
-        if (mPos == 0 && !musicFiles.isEmpty()) {
-            chosenMusic = musicFiles.get(new Random().nextInt(musicFiles.size()));
-        } else if (mPos >= 2 && (mPos - 2) < musicFiles.size()) {
-            chosenMusic = musicFiles.get(mPos - 2);
-        }
-        final File musicFile = chosenMusic;
-
+        final File musicFile = musicFiles.isEmpty() ? null : musicFiles.get(new Random().nextInt(musicFiles.size()));
         final int nSlides = Math.max(1, (totalFrames / framesPerSlide) + 2);
-        final int[] order = computeSlideOrder(nSlides, urisCopy.size(), modeIdx == 0);
+        final int[] order = computeSlideOrder(nSlides, urisCopy.size());
 
         File outDir = new File(Environment.getExternalStorageDirectory(), "DCIM/Graph");
         if (!outDir.exists() && !outDir.mkdirs()) {
@@ -410,9 +277,9 @@ public class MainActivity extends Activity {
                         order,
                         framesPerSlide,
                         totalFrames,
-                        grayscale,
-                        title,
-                        (title != null && !title.trim().isEmpty()) ? 6 : 0,
+                        true,
+                        "kof26",
+                        4,
                         stoneBitmap,
                         gomotorFont,
                         musicFile,
@@ -421,21 +288,22 @@ public class MainActivity extends Activity {
                 );
                 MediaScannerConnection.scanFile(MainActivity.this,
                         new String[]{outFile.getAbsolutePath()}, new String[]{"video/mp4"}, null);
-                runOnUiThread(() -> onRenderSuccess(outFile));
+                runOnUiThread(() -> onRenderSuccess(outFile, autoShareWhenDone));
             } catch (Exception e) {
                 runOnUiThread(() -> {
-                    statusText.setText("Render error: " + e.getMessage());
-                    renderBtn.setEnabled(true);
+                    statusText.setText("Error: " + e.getMessage());
+                    pickBtn.setEnabled(true);
+                    latestBtn.setEnabled(true);
                 });
             }
         }).start();
     }
 
-    private int[] computeSlideOrder(int nSlides, int poolSize, boolean useDadaOracle) {
+    private int[] computeSlideOrder(int nSlides, int poolSize) {
         int[] order = new int[nSlides];
-        if (useDadaOracle && stoneBytes != null) {
+        if (stoneBytes != null) {
             try {
-                long[] words = dadaBytes64(stoneBytes, nSlides, 0L);
+                long[] words = dadaBytes64(stoneBytes, nSlides, System.currentTimeMillis() & 0xffffL);
                 for (int i = 0; i < nSlides; i++) {
                     order[i] = (int) (Math.abs(words[i]) % poolSize);
                 }
@@ -443,52 +311,36 @@ public class MainActivity extends Activity {
             } catch (Throwable ignored) {
             }
         }
-        Random rng = new Random(System.currentTimeMillis());
-        for (int i = 0; i < nSlides; i++) {
-            order[i] = rng.nextInt(Math.max(1, poolSize));
-        }
+        Random rng = new Random();
+        for (int i = 0; i < nSlides; i++) order[i] = rng.nextInt(Math.max(1, poolSize));
         return order;
     }
 
-    private void onRenderSuccess(File outFile) {
+    private void onRenderSuccess(File outFile, boolean autoShare) {
         lastRenderedMp4 = outFile;
-        renderBtn.setEnabled(true);
-        shareAllBtn.setEnabled(true);
-        shareWaBtn.setEnabled(true);
-        shareFbBtn.setEnabled(true);
-        statusText.setText("Saved: " + outFile.getAbsolutePath() + " (" + (outFile.length() / 1024) + " KB)");
+        pickBtn.setEnabled(true);
+        latestBtn.setEnabled(true);
+        shareBtn.setEnabled(true);
+        statusText.setText("Ready: " + outFile.getName() + " (" + (outFile.length() / 1024) + " KB)");
         try {
             videoPreview.setVideoPath(outFile.getAbsolutePath());
             videoPreview.setOnPreparedListener(mp -> mp.setLooping(true));
             videoPreview.start();
         } catch (Exception ignored) {
         }
+        if (autoShare) {
+            shareRenderedVideo();
+        }
     }
 
-    private void shareRenderedVideo(String targetPackage) {
+    private void shareRenderedVideo() {
         if (lastRenderedMp4 == null || !lastRenderedMp4.exists()) return;
         Uri uri = GraphFileProvider.getUriForFile(lastRenderedMp4);
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("video/mp4");
         send.putExtra(Intent.EXTRA_STREAM, uri);
         send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-        if (targetPackage != null) {
-            PackageManager pm = getPackageManager();
-            Intent pkgIntent = new Intent(send);
-            pkgIntent.setPackage(targetPackage);
-            if (pkgIntent.resolveActivity(pm) != null) {
-                startActivity(pkgIntent);
-                return;
-            } else if ("com.facebook.katana".equals(targetPackage)) {
-                pkgIntent.setPackage("com.facebook.lite");
-                if (pkgIntent.resolveActivity(pm) != null) {
-                    startActivity(pkgIntent);
-                    return;
-                }
-            }
-        }
-        startActivity(Intent.createChooser(send, "Share Graph Video"));
+        startActivity(Intent.createChooser(send, "Share Video"));
     }
 
     private TextView label(String text, int sp, String hexColor) {
@@ -497,12 +349,6 @@ public class MainActivity extends Activity {
         tv.setTextSize(sp);
         tv.setTextColor(Color.parseColor(hexColor));
         tv.setTypeface(Typeface.MONOSPACE);
-        return tv;
-    }
-
-    private TextView sectionLabel(String text) {
-        TextView tv = label(text, 12, "#00FF66");
-        tv.setPadding(0, dp(12), 0, dp(4));
         return tv;
     }
 

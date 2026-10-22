@@ -1,0 +1,7 @@
+build/
+*.apk
+*.idsig
+*.keystore
+*.db
+*token*
+*secret*

@@ -399,6 +399,7 @@ public class MainActivity extends Activity {
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("video/mp4");
         send.putExtra(Intent.EXTRA_STREAM, uri);
+        send.setClipData(ClipData.newRawUri("Video", uri));
         send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(Intent.createChooser(send, "Share Video"));
     }

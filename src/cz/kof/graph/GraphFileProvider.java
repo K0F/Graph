@@ -33,20 +33,22 @@ public class GraphFileProvider extends ContentProvider {
         if (projection == null) {
             projection = new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE};
         }
-        String[] cols = new String[projection.length];
-        Object[] vals = new Object[projection.length];
-        int i = 0;
+        java.util.List<String> cols = new java.util.ArrayList<>();
+        java.util.List<Object> vals = new java.util.ArrayList<>();
         for (String col : projection) {
             if (OpenableColumns.DISPLAY_NAME.equals(col)) {
-                cols[i] = OpenableColumns.DISPLAY_NAME;
-                vals[i++] = file.getName();
+                cols.add(OpenableColumns.DISPLAY_NAME);
+                vals.add(file.getName());
             } else if (OpenableColumns.SIZE.equals(col)) {
-                cols[i] = OpenableColumns.SIZE;
-                vals[i++] = file.length();
+                cols.add(OpenableColumns.SIZE);
+                vals.add(file.length());
+            } else if ("_data".equals(col)) {
+                cols.add("_data");
+                vals.add(file.getAbsolutePath());
             }
         }
-        MatrixCursor cursor = new MatrixCursor(cols, 1);
-        cursor.addRow(vals);
+        MatrixCursor cursor = new MatrixCursor(cols.toArray(new String[0]), 1);
+        cursor.addRow(vals.toArray(new Object[0]));
         return cursor;
     }
 

@@ -58,9 +58,9 @@ public class VideoRenderer {
         encoder.start();
 
         MediaMuxer muxer = new MediaMuxer(outFile.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
-        int videoTrackIdx = -1;
+        final int[] videoTrackHolder = new int[]{-1};
+        final boolean[] muxerStartedHolder = new boolean[]{false};
         int audioTrackIdx = -1;
-        boolean muxerStarted = false;
 
         MediaExtractor audioExtractor = null;
         if (musicFile != null && musicFile.exists()) {
@@ -146,7 +146,7 @@ public class VideoRenderer {
 
                 int inIdx = encoder.dequeueInputBuffer(10000);
                 while (inIdx < 0) {
-                    drainEncoder(encoder, muxer, info, false, new int[]{videoTrackIdx}, new boolean[]{muxerStarted});
+                    drainEncoder(encoder, muxer, info, false, videoTrackHolder, muxerStartedHolder);
                     inIdx = encoder.dequeueInputBuffer(10000);
                 }
                 ByteBuffer inBuf = encoder.getInputBuffer(inIdx);
@@ -176,18 +176,20 @@ public class VideoRenderer {
                 if (outIdx == MediaCodec.INFO_TRY_AGAIN_LATER) {
                     if (f < totalFrames) break;
                 } else if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    videoTrackIdx = muxer.addTrack(encoder.getOutputFormat());
-                    muxer.start();
-                    muxerStarted = true;
+                    if (!muxerStartedHolder[0]) {
+                        videoTrackHolder[0] = muxer.addTrack(encoder.getOutputFormat());
+                        muxer.start();
+                        muxerStartedHolder[0] = true;
+                    }
                 } else if (outIdx >= 0) {
                     ByteBuffer encoded = encoder.getOutputBuffer(outIdx);
                     if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
                         info.size = 0;
                     }
-                    if (info.size > 0 && muxerStarted && encoded != null) {
+                    if (info.size > 0 && muxerStartedHolder[0] && encoded != null) {
                         encoded.position(info.offset);
                         encoded.limit(info.offset + info.size);
-                        muxer.writeSampleData(videoTrackIdx, encoded, info);
+                        muxer.writeSampleData(videoTrackHolder[0], encoded, info);
                     }
                     encoder.releaseOutputBuffer(outIdx, false);
                     if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -197,7 +199,7 @@ public class VideoRenderer {
             }
         }
 
-        if (audioExtractor != null && audioTrackIdx >= 0 && muxerStarted) {
+        if (audioExtractor != null && audioTrackIdx >= 0 && muxerStartedHolder[0]) {
             long maxDurationUs = (totalFrames * 1000000L) / FPS;
             ByteBuffer aBuf = ByteBuffer.allocate(65536);
             MediaCodec.BufferInfo aInfo = new MediaCodec.BufferInfo();
@@ -218,7 +220,7 @@ public class VideoRenderer {
 
         encoder.stop();
         encoder.release();
-        if (muxerStarted) {
+        if (muxerStartedHolder[0]) {
             muxer.stop();
         }
         muxer.release();

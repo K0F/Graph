@@ -20,6 +20,8 @@ APK         := $(BUILD_DIR)/Graph.apk
 
 JAVA_SRC := src/cz/kof/graph/GraphFileProvider.java \
             src/cz/kof/graph/VideoRenderer.java \
+            src/cz/kof/graph/Postgen.java \
+            src/cz/kof/graph/PostgenActivity.java \
             src/cz/kof/graph/MainActivity.java
 
 all: apk

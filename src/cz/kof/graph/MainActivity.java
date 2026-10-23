@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
     private Button pickBtn;
     private Button latestBtn;
     private Button shareBtn;
+    private Button postgenBtn;
 
     private File lastRenderedMp4 = null;
     private byte[] stoneBytes = null;
@@ -130,9 +131,9 @@ public class MainActivity extends Activity {
         pickBtn.setOnClickListener(v -> openGalleryPicker());
         root.addView(pickBtn, btnLp);
 
-        latestBtn = button("2. LATEST CAMERA PHOTOS & RENDER", "#222222", "#FFFFFF");
+        latestBtn = button("2. LAST WEEK PHOTOS & RENDER", "#222222", "#FFFFFF");
         latestBtn.setOnClickListener(v -> {
-            if (loadLatestCameraPhotos(24)) {
+            if (loadLatestCameraPhotos()) {
                 startRender(true);
             }
         });
@@ -148,6 +149,10 @@ public class MainActivity extends Activity {
         shareBtn.setEnabled(false);
         shareBtn.setOnClickListener(v -> shareRenderedVideo());
         root.addView(shareBtn, btnLp);
+
+        postgenBtn = button("4. SHARE LAST WEEK VIA POSTGEN", "#002233", "#00CCFF");
+        postgenBtn.setOnClickListener(v -> shareLastWeekViaPostgen());
+        root.addView(postgenBtn, btnLp);
 
         setContentView(root);
     }
@@ -195,8 +200,18 @@ public class MainActivity extends Activity {
                     if (u != null) selectedUris.add(u);
                 }
             }
+            List<Uri> cleanUris = new ArrayList<>();
+            for (Uri u : selectedUris) {
+                if (!Postgen.isDocumentPhoto(this, u)) {
+                    cleanUris.add(u);
+                }
+            }
+            selectedUris.clear();
+            selectedUris.addAll(cleanUris);
             if (!selectedUris.isEmpty()) {
                 startRender(true);
+            } else {
+                statusText.setText("Document reproduction skipped — no normal photos to render.");
             }
         }
     }
@@ -222,29 +237,71 @@ public class MainActivity extends Activity {
             } else if (data.getData() != null) {
                 selectedUris.add(data.getData());
             }
+            List<Uri> cleanUris = new ArrayList<>();
+            for (Uri u : selectedUris) {
+                if (!Postgen.isDocumentPhoto(this, u)) {
+                    cleanUris.add(u);
+                }
+            }
+            selectedUris.clear();
+            selectedUris.addAll(cleanUris);
             if (!selectedUris.isEmpty()) {
                 startRender(true);
             }
         }
     }
 
-    private boolean loadLatestCameraPhotos(int maxCount) {
-        File camDir = new File(Environment.getExternalStorageDirectory(), "DCIM/Camera");
-        File[] files = camDir.listFiles((dir, name) -> {
-            String low = name.toLowerCase(Locale.ROOT);
-            return !name.startsWith(".") && (low.endsWith(".jpg") || low.endsWith(".jpeg") || low.endsWith(".png"));
-        });
-        if (files == null || files.length == 0) {
+    private boolean loadLatestCameraPhotos() {
+        List<File> photos = Postgen.loadLastWeekCameraPhotos();
+        if (photos.isEmpty()) {
             statusText.setText("No photos in DCIM/Camera — tap Pick Photos.");
             return false;
         }
-        Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
         selectedUris.clear();
-        int lim = Math.min(maxCount, files.length);
-        for (int i = 0; i < lim; i++) {
-            selectedUris.add(Uri.fromFile(files[i]));
+        for (File f : photos) {
+            selectedUris.add(Uri.fromFile(f));
         }
+        statusText.setText("Selected " + selectedUris.size() + " photos from last week.");
         return true;
+    }
+
+    private void shareLastWeekViaPostgen() {
+        postgenBtn.setEnabled(false);
+        pickBtn.setEnabled(false);
+        latestBtn.setEnabled(false);
+        statusText.setText("Loading last week photos for Postgen...");
+        new Thread(() -> {
+            List<File> photos = Postgen.loadLastWeekCameraPhotos();
+            if (photos.isEmpty()) {
+                runOnUiThread(() -> {
+                    statusText.setText("No camera photos found from last week.");
+                    postgenBtn.setEnabled(true);
+                    pickBtn.setEnabled(true);
+                    latestBtn.setEnabled(true);
+                    postgenBtn.setEnabled(true);
+                });
+                return;
+            }
+            int total = photos.size();
+            int posted = 0;
+            for (int i = 0; i < total; i++) {
+                final int idx = i;
+                File f = photos.get(i);
+                boolean ok = Postgen.processImageForPostgen(this, Uri.fromFile(f), (cur, tot, fn) -> {
+                    runOnUiThread(() -> statusText.setText("Postgen (" + cur + "/" + tot + "): " + fn));
+                }, idx + 1, total);
+                if (ok) posted++;
+            }
+            final int finalPosted = posted;
+            runOnUiThread(() -> {
+                statusText.setText("Postgen ready: " + finalPosted + " posts in DCIM/postgen");
+                postgenBtn.setEnabled(true);
+                pickBtn.setEnabled(true);
+                latestBtn.setEnabled(true);
+                android.widget.Toast.makeText(this, "Postgen: " + finalPosted + " posts generated in DCIM/postgen",
+                        android.widget.Toast.LENGTH_LONG).show();
+            });
+        }).start();
     }
 
     private void startRender(final boolean autoShareWhenDone) {
@@ -252,6 +309,7 @@ public class MainActivity extends Activity {
         pickBtn.setEnabled(false);
         latestBtn.setEnabled(false);
         shareBtn.setEnabled(false);
+        postgenBtn.setEnabled(false);
 
         scanMusicPool();
         final int framesPerSlide = 11; // 0.44s per slide
@@ -294,6 +352,7 @@ public class MainActivity extends Activity {
                     statusText.setText("Error: " + e.getMessage());
                     pickBtn.setEnabled(true);
                     latestBtn.setEnabled(true);
+                    postgenBtn.setEnabled(true);
                 });
             }
         }).start();
@@ -321,6 +380,7 @@ public class MainActivity extends Activity {
         pickBtn.setEnabled(true);
         latestBtn.setEnabled(true);
         shareBtn.setEnabled(true);
+        postgenBtn.setEnabled(true);
         statusText.setText("Ready: " + outFile.getName() + " (" + (outFile.length() / 1024) + " KB)");
         try {
             videoPreview.setVideoPath(outFile.getAbsolutePath());

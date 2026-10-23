@@ -39,6 +39,23 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="cz.kof.graph.PostgenActivity"
+            android:label="Postgen"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
         <provider
             android:name="cz.kof.graph.GraphFileProvider"
             android:authorities="cz.kof.graph.provider"
